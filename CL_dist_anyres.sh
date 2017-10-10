@@ -1,25 +1,40 @@
 #!/bin/bash
-# Script to measure dist between key residues and CL head groups
-# Modified from time spent for CL sims 
-## REQUIRES MANUAL TRIMMING OF XTC TO MATCH BILAYER FORMATION!!
+###############################################################
+# Script to measure dist between all residues in a protein MD #
+# trajectory and a lipid head group (can define). MARTINI     #
+###############################################################
 
-ARRAY=(CG_0 CG_1 CG_2 CG_3 CG_4 CG_5 CG_6 CG_7 CG_8 CG_9)
-ARRAYLEN=`echo ${#ARRAY[@]} - 1 | bc`
-CURRENTDIR=`pwd`
-RES=$1
+TRAJ=$1
+TPR=$2
+RES=$3
 
-if [ -z "${RES}" ]; then
-        echo "add a fcuking variable you tard"
+if [ ${TRAJ} == "-h" ]; then
+	echo "
+Run this programme in your working folder, and supply input files as follows:"
+fi
+
+if [ -z "${TRAJ}" ]; then
+        echo "Need to supply a trajectory name"
         exit 0
 fi
 
-####### Rest should be set in stone
+if [ ${TRAJ: -3} != "xtc" ] && [ ${TRAJ: -3} != "trr" ]; then
+        echo "Trajectory needs to be in trr or xtc format"
+        exit 0
+fi
 
-for j in `seq 0 ${ARRAYLEN}`; do
+if [ ${TPR: -3} != "tpr" ]; then
+        echo "Tpr file needed"
+        exit 0
+fi
+
+if [ -z "${RES}" ]; then
+        echo "Please supply a three character residue name, e.g. LYS "
+        exit 0
+fi
+
 
 cd $CURRENTDIR
-cd ${ARRAY[j]} 
-
 rm -f equilibration_3_${ARRAY[j]}.input.gro
 
 TPR=equilibration_3_${ARRAY[j]}.tpr
