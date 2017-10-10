@@ -4,42 +4,46 @@
 # trajectory and a lipid head group (can define). MARTINI     #
 ###############################################################
 
-TRAJ=$1
-TPR=$2
-RES=$3
+TRAJ=$1    ; TRAJ2=${TRAJ::-4}
+TPR=$2     ; TPR2=${TPR::-4}
+RES=$3   
+LIPID=$4
 
-if [ ${TRAJ} == "-h" ]; then
+if [ "${TRAJ}" == "-h" ]; then
 	echo "
-Run this programme in your working folder, and supply input files as follows:"
+Run this programme in your working folder, and supply input files as follows:
+./CL_dist_anyres.sh trajectoryname.xtc runinput.tpr LYS
+"
+	exit 0
 fi
 
 if [ -z "${TRAJ}" ]; then
-        echo "Need to supply a trajectory name"
+        echo "Need to supply a trajectory name
+run ./CL_dist_anyres.sh -h for help"
         exit 0
 fi
 
 if [ ${TRAJ: -3} != "xtc" ] && [ ${TRAJ: -3} != "trr" ]; then
-        echo "Trajectory needs to be in trr or xtc format"
+        echo "Trajectory needs to be in trr or xtc format
+run ./CL_dist_anyres.sh -h for help"
         exit 0
 fi
 
 if [ ${TPR: -3} != "tpr" ]; then
-        echo "Tpr file needed"
+        echo "Tpr file needed
+run ./CL_dist_anyres.sh -h for help"
         exit 0
 fi
 
 if [ -z "${RES}" ]; then
-        echo "Please supply a three character residue name, e.g. LYS "
+        echo "Please supply a three character residue name, e.g. LYS
+run ./CL_dist_anyres.sh -h for help"
         exit 0
 fi
 
-
-cd $CURRENTDIR
-rm -f equilibration_3_${ARRAY[j]}.input.gro
-
-TPR=equilibration_3_${ARRAY[j]}.tpr
-#$GMX5/editconf -f equilibration_2.gro -o equilibration_3_${ARRAY[j]}.input.gro >& edc
-GRO=equilibration_2.gro
+rm -f ${TPR2}.input.gro
+editconf -f ${TPR} -o ${TPR2}.input.gro >& edc_output
+GRO=${TPR2}.input.gro
 
 rm -f index.ndx
 
