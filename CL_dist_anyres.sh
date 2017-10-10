@@ -46,7 +46,7 @@ editconf -f ${TPR} -o ${TPR2}.input.gro >& edc_output
 GRO=${TPR2}.input.gro
 
 rm -f index.ndx
-
+phos=($(grep CAR ${TPR2}.input.gro  | grep " P"  | awk '{print $3}' | sort -u))
 echo -e "aPO1 | aPO2 | aGL0" '\n' q | make_ndx -f $GRO -o index.ndx >& md1
 
 ## First, define chains
