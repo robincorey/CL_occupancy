@@ -1,128 +1,91 @@
 #!/bin/bash
 # Script to measure dist between key residues and CL head groups
+# Modified from time spent for CL sims 
+## REQUIRES MANUAL TRIMMING OF XTC TO MATCH BILAYER FORMATION!!
 
-ARRAY=(*final.xtc)  # processed xtc, in folder
+ARRAY=(CG_0 CG_1 CG_2 CG_3 CG_4 CG_5 CG_6 CG_7 CG_8 CG_9)
+ARRAYLEN=`echo ${#ARRAY[@]} - 1 | bc`
 CURRENTDIR=`pwd`
-TPR=unbiased.tpr
-GRO=minimization.gro
 RES=$1
 
 if [ -z "${RES}" ]; then
-	echo "add a variable"
-	exit 0
+        echo "add a fcuking variable you tard"
+        exit 0
 fi
 
-##############################
-## Need to split by chain
-echo -e "aPO1 | aPO2 | aGL0" '\n' q | make_ndx -f $GRO -o index.ndx
+####### Rest should be set in stone
+
+for j in `seq 0 ${ARRAYLEN}`; do
+
+cd $CURRENTDIR
+cd ${ARRAY[j]} 
+
+rm -f equilibration_3_${ARRAY[j]}.input.gro
+
+TPR=equilibration_3_${ARRAY[j]}.tpr
+#$GMX5/editconf -f equilibration_2.gro -o equilibration_3_${ARRAY[j]}.input.gro >& edc
+GRO=equilibration_2.gro
+
+rm -f index.ndx
+
+echo -e "aPO1 | aPO2 | aGL0" '\n' q | make_ndx -f $GRO -o index.ndx >& md1
+
 ## First, define chains
 chain1=`grep " 1MET     BB" $GRO | awk '{print $3}'`
 chain2=`grep " 1ALA     BB" $GRO | awk '{print $3}'`; chain1b=`echo $chain2 - 1 | bc`
 chain3=`grep " 1GLU     BB" $GRO | awk '{print $3}'`; chain2b=`echo $chain3 - 1 | bc`
 chain4=`grep " 1HIS     BB" $GRO | awk '{print $3}'`; chain3b=`echo $chain4 - 1 | bc`
-chain4b=`grep " 817DPPC   NC3" $GRO | awk '{print $3}'`
+chain4b=`grep " 817DSPE   NH3" $GRO | awk '{print $3}'`
 chain4c=`echo "$chain4b - 1" | bc`
-echo -e a1-$chain0b'\n'a$chain1-$chain1b'\n'a$chain2-$chain2b'\n'a$chain3-$chain3b'\n'a$chain4-$chain4c'\n'q | make_ndx -f $GRO -o chains.ndx -n index.ndx
+
+rm -f chains.ndx
+
+echo -e a$chain1-$chain1b'\n'a$chain2-$chain2b'\n'a$chain3-$chain3b'\n'a$chain4-$chain4c'\n'q | make_ndx -f $GRO -o chains.ndx -n index.ndx >& md2
+
+if [[ ! -f chains.ndx ]]; then echo index making failed; exit 0 ; fi
+
 indices=`grep -c "\[" chains.ndx`
 ## Groups for each chain
 PO4=`echo "$indices - 5" | bc`
-A=`echo "$indices - 4" | bc`
-B=`echo "$indices - 3" | bc`
-C=`echo "$indices - 2" | bc`
-D=`echo "$indices - 1" | bc`
-echo $A | editconf -f $GRO -o A.pdb -n chains.ndx
-echo $B |editconf -f $GRO -o Y.pdb -n chains.ndx
-echo $C |editconf -f $GRO -o E.pdb -n chains.ndx
-echo $D |editconf -f $GRO -o G.pdb -n chains.ndx
 
-ARRAYA=(`grep "BB  ${RES}" A.pdb | awk '{print $5}'`)  # GLN as reasonably few, similar size
-ARRAYY=(`grep "BB  ${RES}" Y.pdb | awk '{print $5}'`)  # to lys, polar, and likely to be
-ARRAYE=(`grep "BB  ${RES}" E.pdb | awk '{print $5}'`)  # located at membrane surface (unlike
-ARRAYG=(`grep "BB  ${RES}" G.pdb | awk '{print $5}'`)  # hydrophobic res)
+rm -f timespent_${ARRAY[j]}_${RES}.xvg
+#echo timespent > timespent_${ARRAY[j]}_${RES}.xvg
 
-ARRAYALEN=`echo ${#ARRAYA[@]} - 1 | bc`
-ARRAYYLEN=`echo ${#ARRAYY[@]} - 1 | bc`
-ARRAYELEN=`echo ${#ARRAYE[@]} - 1 | bc`
-ARRAYGLEN=`echo ${#ARRAYG[@]} - 1 | bc`
+echo "starting distances for ${ARRAY[j]}..."
 
-# Do distance chain by chain
-## SecA
-for j in `seq 0 ${ARRAYLEN}`; do
+CHAIN=(A Y E G)
+IND=(4 3 2 1)
+CHL=`echo "${#CHAIN[@]} -1" | bc`
 
-rm timespent_${ARRAY[j]}_${RES}.xvg
-echo timespent > timespent_${ARRAY[j]}_${RES}.xvg
+if [[ ! -d xvgs/ ]]; then
+        mkdir xvgs/
+fi
 
-## :%s/${ARRAYG\[i\]}\./${ARRAYG\[i\]}_${ARRAY\[j\]}\./g
-for i in `seq 0 ${ARRAYALEN}`; do
-	rm tempA.ndx
-	echo -e "$A & r${ARRAYA[i]}"'\n'q | make_ndx -f $GRO -o tempA.ndx -n chains.ndx
-	if [[ ! -f tempA.ndx ]]; then
-		echo "#################
-		make_ndx failed!
-		##############"
-		exit 0
-	fi
-	echo -e $indices'\n'PO1_PO2_GL0 | g_mindist -f ${ARRAY[j]}.pbc.xtc -s $TPR -n tempA -od SecA_${ARRAYA[i]}_${ARRAY[j]}_${RES}.xvg -nice -5 -tu us
-	echo SecA_${ARRAYA[i]} >> timespent_${ARRAY[j]}_${RES}.xvg 
-	num=`egrep -v "\#|\@" SecA_${ARRAYA[i]}_${ARRAY[j]}_${RES}.xvg | awk '{print $2}' | egrep "\-01" | egrep "^1|^2|^3|^4|^5|^6|^7" | wc -l`
-	tot=`egrep -v "\#|\@" SecA_${ARRAYA[i]}_${ARRAY[j]}_${RES}.xvg | wc -l`
-	occ=`echo "scale=3 ; $num / $tot * 100" | bc`
-	echo $occ >> timespent_${ARRAY[j]}_${RES}.xvg
+for k in `seq 0 $CHL`; do
+        LETTER=`echo "$indices - ${IND[k]}" | bc`
+        echo $LETTER | editconf -f $GRO -o ${CHAIN[k]}.pdb -n chains.ndx >& eda
+	CHARRAY=(`grep "BB  ${RES}" ${CHAIN[k]}.pdb | awk '{print $5}'`)
+	CHAL=`echo ${#CHARRAY[@]} - 1 | bc` #
+	for i in `seq 0 $CHAL`; do
+		echo  $RES ${CHARRAY[i]}
+		rm -f temp_${CHAIN[k]}.ndx
+		echo -e "$LETTER & r${CHARRAY[i]}"'\n'q | make_ndx -f $GRO -o temp_${CHAIN[k]} -n chains.ndx >& mdA
+		if [[ ! -f temp_${CHAIN[k]}.ndx ]]; then
+			echo "#################
+			make_ndx failed!
+			##############"
+			exit 0
+		fi
+		echo -e $indices'\n'PO1_PO2_GL0 | $GMX5/g_mindist -f BILAYER_${ARRAY[j]}.xtc -s $TPR -n temp_${CHAIN[k]} -od ${CHAIN[k]}_${CHARRAY[i]}_${ARRAY[j]}_${RES}.xvg -nice -19 -tu us >& dist
+		echo Sec${CHAIN[k]}_${CHARRAY[i]} >> timespent_${ARRAY[j]}_${RES}.xvg 
+        	num=`egrep -v "\#|\@" ${CHAIN[k]}_${CHARRAY[i]}_${ARRAY[j]}_${RES}.xvg  | awk '{print $2}' | egrep "\-01" | egrep "^1|^2|^3|^4|^5|^6|^7" | wc -l`
+        	tot=`egrep -v "\#|\@" ${CHAIN[k]}_${CHARRAY[i]}_${ARRAY[j]}_${RES}.xvg  | wc -l`
+        	occ=`echo "scale=3 ; $num / $tot * 100" | bc`
+        	echo $occ >> timespent_${ARRAY[j]}_${RES}.xvg
+		mv ${CHAIN[k]}_${CHARRAY[i]}*_${RES}.xvg xvgs/
+	done
 done
 
-for i in `seq 0 ${ARRAYYLEN}`; do
-        rm tempY.ndx
-	echo -e "$B & r${ARRAYY[i]}"'\n'q | make_ndx -f $GRO -o tempY.ndx -n chains.ndx
-        if [[ ! -f tempY.ndx ]]; then
-                echo "#################
-                make_ndx failed!
-                ##############"
-                exit 0
-        fi
-	echo -e $indices'\n'PO1_PO2_GL0 | g_mindist -f ${ARRAY[j]}.pbc.xtc -s $TPR -n tempY -od SecY_${ARRAYY[i]}_${ARRAY[j]}_${RES}.xvg -nice -5 -tu us
-        echo SecY_${ARRAYY[i]} >> timespent_${ARRAY[j]}_${RES}.xvg
-        num=`egrep -v "\#|\@" SecY_${ARRAYY[i]}_${ARRAY[j]}_${RES}.xvg | awk '{print $2}' | egrep "\-01" | egrep "^1|^2|^3|^4|^5|^6|^7" | wc -l`
-        tot=`egrep -v "\#|\@" SecY_${ARRAYY[i]}_${ARRAY[j]}_${RES}.xvg | wc -l`
-        occ=`echo "scale=3 ; $num / $tot * 100" | bc`
-        echo $occ >> timespent_${ARRAY[j]}_${RES}.xvg
-done
-
-for i in `seq 0 ${ARRAYELEN}`; do
-        rm tempE.ndx
-	echo -e "$C & r${ARRAYE[i]}"'\n'q | make_ndx -f $GRO -o tempE.ndx -n chains.ndx
-        if [[ ! -f tempE.ndx ]]; then
-                echo "#################
-                make_ndx failed!
-                ##############"
-                exit 0
-        fi
-	echo -e $indices'\n'PO1_PO2_GL0 | g_mindist -f ${ARRAY[j]}.pbc.xtc -s $TPR -n tempE -od SecE_${ARRAYE[i]}_${ARRAY[j]}_${RES}.xvg -nice -5 -tu us
-        echo SecE_${ARRAYE[i]} >> timespent_${ARRAY[j]}_${RES}.xvg
-        num=`egrep -v "\#|\@" SecE_${ARRAYE[i]}_${ARRAY[j]}_${RES}.xvg | awk '{print $2}' | egrep "\-01" | egrep "^1|^2|^3|^4|^5|^6|^7" | wc -l`
-        tot=`egrep -v "\#|\@" SecE_${ARRAYE[i]}_${ARRAY[j]}_${RES}.xvg | wc -l`
-        occ=`echo "scale=3 ; $num / $tot * 100" | bc`
-	echo $occ >> timespent_${ARRAY[j]}_${RES}.xvg
-done
-
-for i in `seq 0 ${ARRAYGLEN}`; do
-        rm tempG.ndx
-	echo -e "$D & r${ARRAYG[i]}"'\n'q | make_ndx -f $GRO -o tempG.ndx -n chains.ndx
-        if [[ ! -f tempG.ndx ]]; then
-                echo "#################
-                make_ndx failed!
-                ##############"
-                exit 0
-        fi
-	echo -e $indices'\n'PO1_PO2 | g_mindist -f ${ARRAY[j]}.pbc.xtc -s $TPR -n tempG -od SecG_${ARRAYG[i]}_${ARRAY[j]}_${RES}.xvg -nice -5 -tu us
-        echo SecG_${ARRAYG[i]} >> timespent_${ARRAY[j]}_${RES}.xvg
-        num=`egrep -v "\#|\@" SecG_${ARRAYG[i]}_${ARRAY[j]}_${RES}.xvg | awk '{print $2}' | egrep "\-01" | egrep "^1|^2|^3|^4|^5|^6|^7" | wc -l`
-        tot=`egrep -v "\#|\@" SecG_${ARRAYG[i]}_${ARRAY[j]}_${RES}.xvg | wc -l`
-        occ=`echo "scale=3 ; $num / $tot * 100" | bc`
-	echo $occ >> timespent_${ARRAY[j]}_${RES}.xvg
-
-grep Sec timespent_${ARRAY[j]}_${RES}.xvg > Sec_${RES}.xvg
-
-done
 
 done
 
@@ -132,6 +95,7 @@ fi
 
 mv *#* Backups/
 
+grep Sec timespent_${ARRAY[j]}_${RES}.xvg > Sec_${RES}.xvg
 paste -d ',' timespent_*_${RES}.xvg > timespentall_${RES}.xvg
 egrep -v Sec timespentall_${RES}.xvg > values_${RES}.xvg
 paste -d ',' Sec_${RES}.xvg values_${RES}.xvg > timespentall_${RES}.xvg
