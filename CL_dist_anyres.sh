@@ -49,7 +49,7 @@ rm -f index.ndx
 phos=($(grep CAR ${TPR2}.input.gro  | grep " P"  | awk '{print $3}' | sort -u))
 echo -e "aPO1 | aPO2 | aGL0" '\n' q | make_ndx -f $GRO -o index.ndx >& md1
 
-## First, define chains
+## First, define chains. Currently 3DIN specific
 chain1=`grep " 1MET     BB" $GRO | awk '{print $3}'`
 chain2=`grep " 1ALA     BB" $GRO | awk '{print $3}'`; chain1b=`echo $chain2 - 1 | bc`
 chain3=`grep " 1GLU     BB" $GRO | awk '{print $3}'`; chain2b=`echo $chain3 - 1 | bc`
@@ -68,7 +68,7 @@ indices=`grep -c "\[" chains.ndx`
 PO4=`echo "$indices - 5" | bc`
 
 rm -f timespent_${ARRAY[j]}_${RES}.xvg
-#echo timespent > timespent_${ARRAY[j]}_${RES}.xvg
+echo timespent > timespent_${ARRAY[j]}_${RES}.xvg
 
 echo "starting distances for ${ARRAY[j]}..."
 
